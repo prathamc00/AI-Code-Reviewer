@@ -2,11 +2,6 @@
 
 An AI-powered code review tool that analyzes GitHub repositories and pull requests using static analysis combined with GPT-4 intelligence to detect security vulnerabilities, performance issues, and code quality problems.
 
-![AI Code Reviewer](https://img.shields.io/badge/AI-Powered-blue)
-![Python](https://img.shields.io/badge/Python-3.9+-blue)
-![React](https://img.shields.io/badge/React-18+-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green)
-
 ## Features
 
 ### Static Analysis Engine
@@ -19,11 +14,6 @@ An AI-powered code review tool that analyzes GitHub repositories and pull reques
 - Generates actionable fix suggestions
 - Assigns severity ratings (1-5 scale) to prioritize fixes
 
-### Premium UI
-- Modern dark theme with glassmorphism effects
-- Real-time analysis progress tracking
-- Interactive filtering by category and severity
-- Responsive design for all devices
 
 ## Architecture
 
