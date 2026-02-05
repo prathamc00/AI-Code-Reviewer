@@ -1,11 +1,11 @@
 """
-LLM reviewer using OpenAI GPT-4 to enhance static analysis findings.
+LLM reviewer using Google Gemini API.
 """
 
 import os
 import json
 from typing import List
-from openai import OpenAI
+import google.generativeai as genai
 from dotenv import load_dotenv
 from analyzer.models import Finding, EnhancedFinding
 
@@ -13,33 +13,25 @@ load_dotenv()
 
 
 class LLMReviewer:
-    """OpenAI GPT-4 integration for enhancing code findings."""
+    """Google Gemini for enhancing code findings."""
     
     def __init__(self):
-        """Initialize OpenAI client."""
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
+        """Initialize Gemini client."""
+        self.gemini_key = os.getenv("GEMINI_API_KEY")
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         
-        self.client = OpenAI(api_key=api_key)
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        if not self.gemini_key:
+            raise ValueError("GEMINI_API_KEY not found. Set it in environment variables.")
+        
+        genai.configure(api_key=self.gemini_key)
+        self.model = genai.GenerativeModel(self.gemini_model)
     
     def enhance_findings(self, findings: List[Finding]) -> List[EnhancedFinding]:
-        """
-        Enhance static analysis findings with LLM insights.
-        
-        Args:
-            findings: List of findings from static analysis
-            
-        Returns:
-            List of enhanced findings with explanations, fixes, and severity
-        """
+        """Enhance static analysis findings with LLM insights."""
         if not findings:
             return []
         
         enhanced = []
-        
-        # Process findings in batches for efficiency
         batch_size = 5
         for i in range(0, len(findings), batch_size):
             batch = findings[i:i + batch_size]
@@ -50,53 +42,32 @@ class LLMReviewer:
     def _process_batch(self, findings: List[Finding]) -> List[EnhancedFinding]:
         """Process a batch of findings."""
         enhanced = []
-        
         for finding in findings:
             try:
                 enhancement = self._enhance_single_finding(finding)
                 enhanced.append(enhancement)
-            except Exception as e:
-                print(f"Warning: Failed to enhance finding: {e}")
+            except Exception as error:
+                print(f"Warning: Failed to enhance finding: {error}")
                 # Fallback: create enhanced finding with default values
                 enhanced.append(self._create_fallback_enhancement(finding))
         
         return enhanced
     
+    def _call_llm(self, prompt: str) -> str:
+        """Call Gemini API."""
+        system_prompt = "You are a senior software engineer conducting a code review. Provide clear, actionable feedback."
+        full_prompt = f"{system_prompt}\n\n{prompt}"
+        
+        print(f"Using Gemini: {self.gemini_model}")
+        response = self.model.generate_content(full_prompt)
+        return response.text
+    
     def _enhance_single_finding(self, finding: Finding) -> EnhancedFinding:
-        """
-        Enhance a single finding using GPT-4.
-        
-        Args:
-            finding: Finding from static analysis
-            
-        Returns:
-            Enhanced finding with LLM insights
-        """
-        # Create structured prompt
+        """Enhance a single finding using LLM."""
         prompt = self._create_prompt(finding)
-        
-        # Call OpenAI API
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a senior software engineer conducting a code review. Provide clear, actionable feedback."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.3,  # Lower temperature for more consistent output
-            max_tokens=500
-        )
-        
-        # Parse response
-        content = response.choices[0].message.content
+        content = self._call_llm(prompt)
         parsed = self._parse_llm_response(content)
         
-        # Create enhanced finding
         return EnhancedFinding(
             file=finding.file,
             line=finding.line,
@@ -143,17 +114,8 @@ Format your response as JSON:
 ```"""
     
     def _parse_llm_response(self, content: str) -> dict:
-        """
-        Parse LLM response to extract structured data.
-        
-        Args:
-            content: Raw LLM response
-            
-        Returns:
-            Dictionary with explanation, suggested_fix, and severity
-        """
+        """Parse LLM response to extract structured data."""
         try:
-            # Try to extract JSON from code block
             if "```json" in content:
                 json_start = content.find("```json") + 7
                 json_end = content.find("```", json_start)
@@ -166,16 +128,13 @@ Format your response as JSON:
                 json_str = content.strip()
             
             parsed = json.loads(json_str)
-            
-            # Validate and normalize
             return {
                 'explanation': parsed.get('explanation', 'No explanation provided'),
                 'suggested_fix': parsed.get('suggested_fix', 'No fix suggested'),
-                'severity': max(1, min(5, int(parsed.get('severity', 3))))  # Clamp to 1-5
+                'severity': max(1, min(5, int(parsed.get('severity', 3))))
             }
-        except (json.JSONDecodeError, ValueError, KeyError) as e:
-            print(f"Warning: Failed to parse LLM response: {e}")
-            # Try to extract information manually
+        except (json.JSONDecodeError, ValueError, KeyError) as error:
+            print(f"Warning: Failed to parse LLM response: {error}")
             return {
                 'explanation': content[:200] if len(content) > 200 else content,
                 'suggested_fix': 'See explanation for details',
@@ -184,13 +143,7 @@ Format your response as JSON:
     
     def _create_fallback_enhancement(self, finding: Finding) -> EnhancedFinding:
         """Create a basic enhancement when LLM fails."""
-        # Default severity based on category
-        severity_map = {
-            'Security': 4,
-            'Performance': 3,
-            'Code Quality': 2
-        }
-        
+        severity_map = {'Security': 4, 'Performance': 3, 'Code Quality': 2}
         return EnhancedFinding(
             file=finding.file,
             line=finding.line,

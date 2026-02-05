@@ -56,7 +56,6 @@ class SecurityAnalyzer:
         
         for pattern, message in patterns:
             for match in re.finditer(pattern, code, re.IGNORECASE):
-                # Find line number
                 line_num = code[:match.start()].count('\n') + 1
                 snippet = lines[line_num - 1].strip()
                 
@@ -100,33 +99,48 @@ class SecurityVisitor(ASTVisitor):
     
     def visit_Call(self, node: ast.Call):
         """Check function calls for dangerous patterns."""
-        # Check for eval() and exec()
-        if isinstance(node.func, ast.Name):
-            if node.func.id in ['eval', 'exec']:
-                self.findings.append(BaseAnalyzer.create_finding(
-                    file=self.filename,
-                    line=node.lineno,
-                    issue=f"Dangerous function '{node.func.id}()' detected - can execute arbitrary code",
-                    category=IssueCategory.SECURITY,
-                    code_snippet=self.get_line_content(node.lineno),
-                    context=self.get_context(node.lineno)
-                ))
-            
-            # Check for pickle.loads
-            elif node.func.id == 'loads':
-                # Check if it's from pickle module
-                self.findings.append(BaseAnalyzer.create_finding(
-                    file=self.filename,
-                    line=node.lineno,
-                    issue="Use of pickle.loads() can execute arbitrary code from untrusted data",
-                    category=IssueCategory.SECURITY,
-                    code_snippet=self.get_line_content(node.lineno),
-                    context=self.get_context(node.lineno)
-                ))
-                
-        # Check for os.system and subprocess without shell=False
+        self._check_dangerous_eval_exec(node)
+        self._check_pickle_loads(node)
+        self._check_unsafe_system_calls(node)
+        self.generic_visit(node)
+
+    def _check_dangerous_eval_exec(self, node: ast.Call):
+        """Check for eval() and exec()."""
+        if isinstance(node.func, ast.Name) and node.func.id in ['eval', 'exec']:
+            self.findings.append(BaseAnalyzer.create_finding(
+                file=self.filename,
+                line=node.lineno,
+                issue=f"Dangerous function '{node.func.id}()' detected - can execute arbitrary code",
+                category=IssueCategory.SECURITY,
+                code_snippet=self.get_line_content(node.lineno),
+                context=self.get_context(node.lineno)
+            ))
+
+    def _check_pickle_loads(self, node: ast.Call):
+        """Check for pickle.loads()."""
+        # Checks if call is pickle.loads() or just loads()
+        is_pickle_loads = False
+        if isinstance(node.func, ast.Attribute) and node.func.attr == 'loads':
+            if isinstance(node.func.value, ast.Name) and node.func.value.id == 'pickle':
+                is_pickle_loads = True
+        elif isinstance(node.func, ast.Name) and node.func.id == 'loads':
+            is_pickle_loads = True # Simplified check
+
+        if is_pickle_loads:
+            self.findings.append(BaseAnalyzer.create_finding(
+                file=self.filename,
+                line=node.lineno,
+                issue="Use of pickle.loads() can execute arbitrary code from untrusted data",
+                category=IssueCategory.SECURITY,
+                code_snippet=self.get_line_content(node.lineno),
+                context=self.get_context(node.lineno)
+            ))
+
+    def _check_unsafe_system_calls(self, node: ast.Call):
+        """Check for os.system and unsafe subprocess calls."""
         if isinstance(node.func, ast.Attribute):
-            if node.func.attr == 'system':
+            # Check for os.system
+            if node.func.attr == 'system' and isinstance(node.func.value, ast.Name) and node.func.value.id == 'os':
                 self.findings.append(BaseAnalyzer.create_finding(
                     file=self.filename,
                     line=node.lineno,
@@ -135,8 +149,8 @@ class SecurityVisitor(ASTVisitor):
                     code_snippet=self.get_line_content(node.lineno),
                     context=self.get_context(node.lineno)
                 ))
-            elif node.func.attr == 'Popen' or node.func.attr == 'call':
-                # Check for shell=True
+            # Check for subprocess calls
+            elif node.func.attr in ['Popen', 'call', 'run']:
                 for keyword in node.keywords:
                     if keyword.arg == 'shell' and isinstance(keyword.value, ast.Constant):
                         if keyword.value.value is True:
@@ -148,5 +162,3 @@ class SecurityVisitor(ASTVisitor):
                                 code_snippet=self.get_line_content(node.lineno),
                                 context=self.get_context(node.lineno)
                             ))
-                            
-        self.generic_visit(node)

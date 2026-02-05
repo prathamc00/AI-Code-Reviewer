@@ -3,7 +3,6 @@ Base static analysis utilities and common functions.
 """
 
 import ast
-import re
 from typing import List, Optional
 from .models import Finding, IssueCategory
 
@@ -28,9 +27,10 @@ class BaseAnalyzer:
         end = min(len(lines), line_number + context_size)
         
         context_lines = []
-        for i in range(start, end):
-            prefix = ">>> " if i == line_number - 1 else "    "
-            context_lines.append(f"{prefix}{lines[i].rstrip()}")
+        for line_idx in range(start, end):
+            prefix = ">>> " if line_idx == line_number - 1 else "    "
+            line_content = lines[line_idx].rstrip()
+            context_lines.append(f"{prefix}{line_content}")
             
         return "\n".join(context_lines)
     

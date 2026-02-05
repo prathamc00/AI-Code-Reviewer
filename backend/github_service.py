@@ -99,13 +99,13 @@ class GitHubService:
                     try:
                         content = file_content.decoded_content.decode('utf-8')
                         files[file_content.path] = content
-                    except Exception as e:
-                        print(f"Warning: Could not decode {file_content.path}: {e}")
+                    except Exception as exc:
+                        print(f"Warning: Could not decode {file_content.path}: {exc}")
                         
             return files
             
-        except GithubException as e:
-            raise Exception(f"GitHub API error: {e.data.get('message', str(e))}")
+        except GithubException as g_exc:
+            raise Exception(f"GitHub API error: {g_exc.data.get('message', str(g_exc))}")
     
     def fetch_pr_diff(self, url: str) -> Dict[str, str]:
         """
@@ -134,13 +134,13 @@ class GitHubService:
                         content_file = repo.get_contents(file.filename, ref=pr.head.sha)
                         content = content_file.decoded_content.decode('utf-8')
                         files[file.filename] = content
-                    except Exception as e:
-                        print(f"Warning: Could not fetch {file.filename}: {e}")
+                    except Exception as exc:
+                        print(f"Warning: Could not fetch {file.filename}: {exc}")
                         
             return files
             
-        except GithubException as e:
-            raise Exception(f"GitHub API error: {e.data.get('message', str(e))}")
+        except GithubException as g_exc:
+            raise Exception(f"GitHub API error: {g_exc.data.get('message', str(g_exc))}")
     
     def is_pr_url(self, url: str) -> bool:
         """Check if URL is a pull request URL."""

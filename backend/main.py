@@ -123,16 +123,16 @@ async def review_code(request: ReviewRequest):
         
         return report
         
-    except ValueError as e:
+    except ValueError as val_error:
         # URL parsing errors
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(val_error))
+    except Exception as exc:
         # Log the full traceback for debugging
-        print(f"Error processing review: {e}")
+        print(f"Error processing review: {exc}")
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(exc)}"
         )
 
 

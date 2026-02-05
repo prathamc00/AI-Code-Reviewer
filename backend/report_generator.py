@@ -42,31 +42,9 @@ class ReportGenerator:
         Returns:
             Dictionary with category and severity breakdowns
         """
-        # Category breakdown
-        category_counts = {
-            IssueCategory.SECURITY: 0,
-            IssueCategory.PERFORMANCE: 0,
-            IssueCategory.CODE_QUALITY: 0
-        }
-        
-        # Severity breakdown
-        severity_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-        
-        # File breakdown
-        file_counts = {}
-        
-        for finding in findings:
-            # Count by category
-            category_counts[finding.category] += 1
-            
-            # Count by severity
-            if 1 <= finding.severity <= 5:
-                severity_counts[finding.severity] += 1
-            
-            # Count by file
-            if finding.file not in file_counts:
-                file_counts[finding.file] = 0
-            file_counts[finding.file] += 1
+        category_counts = ReportGenerator._count_by_category(findings)
+        severity_counts = ReportGenerator._count_by_severity(findings)
+        file_counts = ReportGenerator._count_by_file(findings)
         
         return {
             'by_category': {
@@ -84,3 +62,34 @@ class ReportGenerator:
             'by_file': file_counts,
             'total_files_analyzed': len(file_counts)
         }
+
+    @staticmethod
+    def _count_by_category(findings: List[EnhancedFinding]) -> Dict[IssueCategory, int]:
+        """Count findings by category."""
+        counts = {
+            IssueCategory.SECURITY: 0,
+            IssueCategory.PERFORMANCE: 0,
+            IssueCategory.CODE_QUALITY: 0
+        }
+        for finding in findings:
+            counts[finding.category] += 1
+        return counts
+
+    @staticmethod
+    def _count_by_severity(findings: List[EnhancedFinding]) -> Dict[int, int]:
+        """Count findings by severity."""
+        counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for finding in findings:
+            if 1 <= finding.severity <= 5:
+                counts[finding.severity] += 1
+        return counts
+
+    @staticmethod
+    def _count_by_file(findings: List[EnhancedFinding]) -> Dict[str, int]:
+        """Count findings by file."""
+        counts = {}
+        for finding in findings:
+            if finding.file not in counts:
+                counts[finding.file] = 0
+            counts[finding.file] += 1
+        return counts

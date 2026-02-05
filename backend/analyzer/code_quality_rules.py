@@ -3,7 +3,6 @@ Code quality static analysis rules.
 """
 
 import ast
-import re
 from typing import List
 from .models import Finding, IssueCategory
 from .static_rules import BaseAnalyzer, ASTVisitor
@@ -42,7 +41,14 @@ class CodeQualityVisitor(ASTVisitor):
     
     def visit_FunctionDef(self, node: ast.FunctionDef):
         """Check function definitions for quality issues."""
-        # Check function length
+        self._check_function_length(node)
+        self._check_missing_docstring(node)
+        self._check_parameter_count(node)
+        self._check_complexity(node)
+        self.generic_visit(node)
+    
+    def _check_function_length(self, node: ast.FunctionDef):
+        """Check if function is too long."""
         if hasattr(node, 'end_lineno'):
             func_length = node.end_lineno - node.lineno
             if func_length > 50:
@@ -54,11 +60,11 @@ class CodeQualityVisitor(ASTVisitor):
                     code_snippet=f"def {node.name}(...)",
                     context=self.get_context(node.lineno)
                 ))
-        
-        # Check for missing docstring
+
+    def _check_missing_docstring(self, node: ast.FunctionDef):
+        """Check for missing docstring in public functions."""
         docstring = ast.get_docstring(node)
         if not docstring and not node.name.startswith('_'):
-            # Only flag public functions
             self.findings.append(BaseAnalyzer.create_finding(
                 file=self.filename,
                 line=node.lineno,
@@ -67,8 +73,9 @@ class CodeQualityVisitor(ASTVisitor):
                 code_snippet=f"def {node.name}(...)",
                 context=self.get_context(node.lineno)
             ))
-        
-        # Check for too many parameters
+
+    def _check_parameter_count(self, node: ast.FunctionDef):
+        """Check if function has too many parameters."""
         if len(node.args.args) > 5:
             self.findings.append(BaseAnalyzer.create_finding(
                 file=self.filename,
@@ -78,8 +85,9 @@ class CodeQualityVisitor(ASTVisitor):
                 code_snippet=f"def {node.name}(...)",
                 context=self.get_context(node.lineno)
             ))
-        
-        # Calculate cyclomatic complexity (simplified)
+
+    def _check_complexity(self, node: ast.FunctionDef):
+        """Check cyclomatic complexity."""
         complexity = self._calculate_complexity(node)
         if complexity > 10:
             self.findings.append(BaseAnalyzer.create_finding(
@@ -90,9 +98,7 @@ class CodeQualityVisitor(ASTVisitor):
                 code_snippet=f"def {node.name}(...)",
                 context=self.get_context(node.lineno)
             ))
-            
-        self.generic_visit(node)
-    
+
     def visit_ClassDef(self, node: ast.ClassDef):
         """Check class definitions for quality issues."""
         # Check for missing docstring
@@ -108,7 +114,7 @@ class CodeQualityVisitor(ASTVisitor):
             ))
         
         # Check for too many methods
-        methods = [n for n in node.body if isinstance(n, ast.FunctionDef)]
+        methods = [body_node for body_node in node.body if isinstance(body_node, ast.FunctionDef)]
         if len(methods) > 20:
             self.findings.append(BaseAnalyzer.create_finding(
                 file=self.filename,
@@ -125,7 +131,6 @@ class CodeQualityVisitor(ASTVisitor):
         """Check variable names for quality."""
         # Check for single-letter variable names (except common ones like i, j, k in loops)
         if len(node.id) == 1 and node.id not in ['i', 'j', 'k', 'x', 'y', 'z', '_']:
-            # Only flag in non-loop contexts (simplified check)
             self.findings.append(BaseAnalyzer.create_finding(
                 file=self.filename,
                 line=node.lineno,
@@ -138,10 +143,7 @@ class CodeQualityVisitor(ASTVisitor):
         self.generic_visit(node)
     
     def _calculate_complexity(self, node: ast.FunctionDef) -> int:
-        """
-        Calculate simplified cyclomatic complexity.
-        Counts decision points: if, for, while, and, or, except
-        """
+        """Calculate simplified cyclomatic complexity."""
         complexity = 1  # Base complexity
         
         for child in ast.walk(node):

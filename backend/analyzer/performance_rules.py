@@ -47,8 +47,13 @@ class PerformanceVisitor(ASTVisitor):
     def visit_For(self, node: ast.For):
         """Check for nested loops and inefficient patterns."""
         self.loop_depth += 1
-        
-        # Check for deeply nested loops (3+ levels)
+        self._check_nested_loop(node)
+        self._check_inefficient_loop_ops(node)
+        self.generic_visit(node)
+        self.loop_depth -= 1
+
+    def _check_nested_loop(self, node: ast.AST):
+        """Check for deeply nested loops (3+ levels)."""
         if self.loop_depth >= 3:
             self.findings.append(BaseAnalyzer.create_finding(
                 file=self.filename,
@@ -58,8 +63,9 @@ class PerformanceVisitor(ASTVisitor):
                 code_snippet=self.get_line_content(node.lineno),
                 context=self.get_context(node.lineno)
             ))
-        
-        # Check for list operations inside loops
+
+    def _check_inefficient_loop_ops(self, node: ast.AST):
+        """Check for list operations inside loops."""
         for child in ast.walk(node):
             if isinstance(child, ast.Call):
                 if isinstance(child.func, ast.Attribute):
@@ -73,24 +79,11 @@ class PerformanceVisitor(ASTVisitor):
                             code_snippet=self.get_line_content(child.lineno),
                             context=self.get_context(child.lineno)
                         ))
-                        
-        self.generic_visit(node)
-        self.loop_depth -= 1
         
     def visit_While(self, node: ast.While):
         """Check while loops for performance issues."""
         self.loop_depth += 1
-        
-        if self.loop_depth >= 3:
-            self.findings.append(BaseAnalyzer.create_finding(
-                file=self.filename,
-                line=node.lineno,
-                issue=f"Deeply nested while loop (depth {self.loop_depth}) may cause performance issues",
-                category=IssueCategory.PERFORMANCE,
-                code_snippet=self.get_line_content(node.lineno),
-                context=self.get_context(node.lineno)
-            ))
-            
+        self._check_nested_loop(node)
         self.generic_visit(node)
         self.loop_depth -= 1
         
@@ -104,34 +97,36 @@ class PerformanceVisitor(ASTVisitor):
     def visit_Call(self, node: ast.Call):
         """Check for blocking calls in async contexts."""
         if self.in_async_function:
-            # Check for blocking I/O calls
-            blocking_funcs = ['sleep', 'read', 'write', 'connect']
-            
-            if isinstance(node.func, ast.Attribute):
-                if node.func.attr in blocking_funcs:
-                    # Make sure it's not asyncio.sleep
-                    if not (isinstance(node.func.value, ast.Name) and 
-                           node.func.value.id == 'asyncio'):
-                        self.findings.append(BaseAnalyzer.create_finding(
-                            file=self.filename,
-                            line=node.lineno,
-                            issue=f"Blocking call '{node.func.attr}()' in async function - use async version",
-                            category=IssueCategory.PERFORMANCE,
-                            code_snippet=self.get_line_content(node.lineno),
-                            context=self.get_context(node.lineno)
-                        ))
-            elif isinstance(node.func, ast.Name):
-                if node.func.id == 'sleep':
+            self._check_blocking_calls(node)
+        self.generic_visit(node)
+
+    def _check_blocking_calls(self, node: ast.Call):
+        """Check for blocking functions in async code."""
+        blocking_funcs = ['sleep', 'read', 'write', 'connect']
+        
+        if isinstance(node.func, ast.Attribute):
+            if node.func.attr in blocking_funcs:
+                # Make sure it's not asyncio.sleep
+                if not (isinstance(node.func.value, ast.Name) and 
+                       node.func.value.id == 'asyncio'):
                     self.findings.append(BaseAnalyzer.create_finding(
                         file=self.filename,
                         line=node.lineno,
-                        issue="Use 'await asyncio.sleep()' instead of 'time.sleep()' in async functions",
+                        issue=f"Blocking call '{node.func.attr}()' in async function - use async version",
                         category=IssueCategory.PERFORMANCE,
                         code_snippet=self.get_line_content(node.lineno),
                         context=self.get_context(node.lineno)
                     ))
-                    
-        self.generic_visit(node)
+        elif isinstance(node.func, ast.Name):
+            if node.func.id == 'sleep':
+                self.findings.append(BaseAnalyzer.create_finding(
+                    file=self.filename,
+                    line=node.lineno,
+                    issue="Use 'await asyncio.sleep()' instead of 'time.sleep()' in async functions",
+                    category=IssueCategory.PERFORMANCE,
+                    code_snippet=self.get_line_content(node.lineno),
+                    context=self.get_context(node.lineno)
+                ))
     
     def visit_ListComp(self, node: ast.ListComp):
         """Check for inefficient list comprehensions."""
@@ -146,5 +141,4 @@ class PerformanceVisitor(ASTVisitor):
                     code_snippet=self.get_line_content(node.lineno),
                     context=self.get_context(node.lineno)
                 ))
-                
         self.generic_visit(node)
