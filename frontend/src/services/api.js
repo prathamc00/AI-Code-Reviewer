@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 // API base URL - uses environment variable in production, falls back to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL
-  ? `https://${import.meta.env.VITE_API_URL}`
-  : 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+console.log('API Base URL:', API_BASE_URL); // Debug log
 
 // Create axios instance with default config
 const api = axios.create({
@@ -11,7 +11,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 120000, // 2 minute timeout for long analysis
+  timeout: 180000, // 3 minute timeout for cold start + analysis
 });
 
 /**
@@ -24,6 +24,7 @@ export const reviewCode = async (url) => {
     const response = await api.post('/api/review', { url });
     return response.data;
   } catch (error) {
+    console.error('API Error:', error);
     throw new Error(
       error.response?.data?.detail ||
       'Failed to review code. Please check the URL and try again.'

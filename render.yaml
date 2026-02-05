@@ -36,7 +36,7 @@ services:
         fromService:
           name: ai-code-reviewer-backend
           type: web
-          property: host
+          property: hostWithScheme
     headers:
       - path: /*
         name: Cache-Control
