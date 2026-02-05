@@ -19,7 +19,7 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
-        value: gpt-4-turbo-preview
+        value: gpt-4o-mini
     healthCheckPath: /api/health
 
   # Frontend - Static Site (Vite/React)

@@ -22,7 +22,7 @@ class LLMReviewer:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         
         self.client = OpenAI(api_key=api_key)
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     
     def enhance_findings(self, findings: List[Finding]) -> List[EnhancedFinding]:
         """
